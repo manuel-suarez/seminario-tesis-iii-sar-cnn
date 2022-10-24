@@ -109,7 +109,7 @@ model=create_model(list(INPUT_SIZE)+[1])
 model.summary()
 test_model(train_generator)
 
-EPOCHS = 100 # The paper has trained the model for 2000 epochs
+EPOCHS = 400 # The paper has trained the model for 2000 epochs
 lr=2e-3
 
 max_var=.3
