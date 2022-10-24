@@ -109,6 +109,7 @@ def step(noisy_data, clean_data):
     return loss,loss_euclidian,loss_tv
 
 model=create_model(list(INPUT_SIZE)+[1])
+model.summary()
 test_model(train_generator)
 
 EPOCHS = 100 # The paper has trained the model for 2000 epochs
