@@ -86,3 +86,14 @@ def create_model(input_shape=(256, 256, 1)):
 
     x = tf.math.tanh(x)
     return tf.keras.Model(inputs=input_layer, outputs=x)
+
+
+MSE = tf.keras.losses.MeanSquaredError(reduction='none')
+
+
+def loss_fn(y_true, y_pred, l_tv=.0002):
+    mse = tf.reduce_sum(MSE(y_true, y_pred))
+    variational_loss = tf.image.total_variation(y_pred)
+    weight_loss = tf.reduce_sum(tf.math.abs(tf.math.divide(1, y_pred + 1e-5)))
+    total_loss = mse + l_tv * variational_loss
+    return tf.reduce_mean(total_loss), tf.reduce_mean(mse), tf.reduce_mean(variational_loss)
