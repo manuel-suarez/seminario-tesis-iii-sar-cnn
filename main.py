@@ -69,28 +69,24 @@ def test_model(data_generator):
 def create_model(input_shape=(256, 256, 1)):
     input_layer = Input(shape=input_shape)
     x = Conv2D(filters=64, kernel_size=(3, 3), padding='same')(input_layer)
-    x = LeakyReLU(.2)(x)
+    x = ReLU()(x)
     #   Here I'm using dialation in convolution layers but in the original paper There are NO dialation used
     for i in range(1, 5):
-        x = Conv2D(filters=64, kernel_size=(3, 3), dilation_rate=i, padding='same', )(x)
+        x = Conv2D(filters=64, kernel_size=(3, 3), padding='same')(x)
         x = BatchNormalization()(x)
-        x = LeakyReLU(.2)(x)
+        x = ReLU()(x)
     for i in range(4, 0, -1):
-        x = Conv2D(filters=64, kernel_size=(3, 3), dilation_rate=i, padding='same')(x)
+        x = Conv2D(filters=64, kernel_size=(3, 3), padding='same')(x)
         x = BatchNormalization()(x)
         x = ReLU()(x)
     x = Conv2D(filters=1, kernel_size=(3, 3), padding='same')(x)
     x = ReLU()(x)
-    x = tf.keras.layers.Lambda(lambda x: x + tf.constant(1e-7))(x)
     x = tf.math.divide(input_layer, x)
-
     x = tf.math.tanh(x)
     return tf.keras.Model(inputs=input_layer, outputs=x)
 
 
 MSE = tf.keras.losses.MeanSquaredError(reduction='none')
-
-
 def loss_fn(y_true, y_pred, l_tv=.0002):
     mse = tf.reduce_sum(MSE(y_true, y_pred))
     variational_loss = tf.image.total_variation(y_pred)
@@ -117,7 +113,7 @@ lr=2e-3
 
 max_var=.3
 
-opt = tf.keras.optimizers.Nadam(learning_rate=lr) # in the paper Adam optimizer with lr=2e-5 ,beta_1=.5 is used but I found this one converging faster
+opt = tf.keras.optimizers.Adam(learning_rate=2e-5, beta_1=0.5) # in the paper Adam optimizer with lr=2e-5 ,beta_1=.5 is used but I found this one converging faster
 train_loss=[]
 n_instances=train_generator.n
 numUpdates = int(n_instances / BS)
