@@ -1,7 +1,15 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow.keras.layers import Input,Conv2D,ReLU,BatchNormalization,LeakyReLU
+import matplotlib.pyplot as plt
+
+from tensorflow import keras
+from tensorflow.keras import layers
+from tensorflow.keras.layers import Input, Conv2D
+from tensorflow.keras.layers import BatchNormalization, Activation, ReLU
+from tensorflow.keras.models import Model
+from tensorflow.keras.models import Sequential
+from keras.utils.vis_utils import plot_model
+
 import os
 from skimage.util import random_noise
 import sys
@@ -9,6 +17,7 @@ import time
 from tqdm.notebook import tqdm
 import shutil
 
+# Prepare data
 INPUT_SIZE= (64,64)
 BS=16
 ROOT_DIR="/home/est_posgrado_manuel.suarez"
@@ -67,48 +76,39 @@ def test_model(data_generator):
 
 # Model creation
 def create_model(input_shape=(256, 256, 1)):
-    input_layer = Input(shape=input_shape)
-    x = Conv2D(filters=64, kernel_size=(3, 3), padding='same')(input_layer)
-    x = LeakyReLU(.2)(x)
-    #   Here I'm using dialation in convolution layers but in the original paper There are NO dialation used
-    for i in range(1, 5):
-        x = Conv2D(filters=64, kernel_size=(3, 3), dilation_rate=i, padding='same', )(x)
-        x = BatchNormalization()(x)
-        x = LeakyReLU(.2)(x)
-    for i in range(4, 0, -1):
-        x = Conv2D(filters=64, kernel_size=(3, 3), dilation_rate=i, padding='same')(x)
-        x = BatchNormalization()(x)
-        x = ReLU()(x)
-    x = Conv2D(filters=1, kernel_size=(3, 3), padding='same')(x)
-    x = ReLU()(x)
-    x = tf.keras.layers.Lambda(lambda x: x + tf.constant(1e-7))(x)
+    # Input Layer
+    input_layer = Input(shape=input_shape, name="InputLayer")
+    # Layer 1 (Conv+ReLU)
+    x = Conv2D(filters=64, kernel_size=(3, 3), padding='same', name="Layer1_Conv2D")(input_layer)
+    x = ReLU(name="Layer1_ReLU")(x)
+    #  Layer 2-7 (Conv+BN+ReLU)
+    for i in range(2, 8):
+        x = Conv2D(filters=64, kernel_size=(3, 3), padding='same', name=f"Layer{i}_Conv2D")(x)
+        x = BatchNormalization(name=f"Layer{i}_BN")(x)
+        x = ReLU(name=f"Layer{i}_ReLU")(x)
+    # Layer 8 (Conv+ReLU)
+    x = Conv2D(filters=1, kernel_size=(3, 3), padding='same', name="Layer8_Conv2D")(x)
+    x = ReLU(name="Layer8_ReLU")(x)
+    # Division residual layer
     x = tf.math.divide(input_layer, x)
-
+    # Nonlinear function layer
     x = tf.math.tanh(x)
     return tf.keras.Model(inputs=input_layer, outputs=x)
 
-
-MSE = tf.keras.losses.MeanSquaredError(reduction='none')
-
-
-def loss_fn(y_true, y_pred, l_tv=.0002):
-    mse = tf.reduce_sum(MSE(y_true, y_pred))
+# Define custom loss
+mse_loss_fn = tf.keras.losses.MeanSquaredError(reduction='none')
+l_tv = l_tv=.0002
+def id_cnn_loss_fn(y_true, y_pred):
+    mse = tf.reduce_sum(mse_loss_fn(y_true, y_pred))
     variational_loss = tf.image.total_variation(y_pred)
-    weight_loss = tf.reduce_sum(tf.math.abs(tf.math.divide(1, y_pred + 1e-5)))
-    total_loss = mse + l_tv * variational_loss
-    return tf.reduce_mean(total_loss), tf.reduce_mean(mse), tf.reduce_mean(variational_loss)
 
-@tf.function
-def step(noisy_data, clean_data):
-    with tf.GradientTape() as tape:
-        pred = model(noisy_data,training=True)
-        total_loss,loss_euclidian,loss_tv = loss_fn(clean_data, pred)
-        loss=tf.add_n([total_loss],model.losses)
-    grads = tape.gradient(total_loss, model.trainable_weights)
-    opt.apply_gradients(zip(grads, model.trainable_weights))
-    return loss,loss_euclidian,loss_tv
+    total_loss = mse + l_tv * variational_loss
+    return tf.reduce_mean(total_loss)
 
 model=create_model(list(INPUT_SIZE)+[1])
+model.summary()
+
+exit(-1)
 test_model(train_generator)
 
 EPOCHS = 100 # The paper has trained the model for 2000 epochs
