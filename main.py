@@ -6,7 +6,6 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Input, Conv2D
 from tensorflow.keras.layers import BatchNormalization, Activation, ReLU
-from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Model
 from tensorflow.keras.models import Sequential
 from keras.utils.vis_utils import plot_model
@@ -96,15 +95,23 @@ def create_model(input_shape=(256, 256, 1)):
     x = tf.math.tanh(x)
     return tf.keras.Model(inputs=input_layer, outputs=x)
 
-# Define custom loss
-mse_loss_fn = tf.keras.losses.MeanSquaredError(reduction='none')
-l_tv = l_tv=0.002
-def id_cnn_loss_fn(y_true, y_pred):
-    mse = tf.reduce_sum(mse_loss_fn(y_true, y_pred))
+mse_loss = tf.keras.losses.MeanSquaredError(reduction='none')
+def loss_fn(y_true, y_pred, l_tv=.0002):
+    mse = tf.reduce_sum(mse_loss(y_true, y_pred))
     variational_loss = tf.image.total_variation(y_pred)
-
+    weight_loss = tf.reduce_sum(tf.math.abs(tf.math.divide(1, y_pred + 1e-5)))
     total_loss = mse + l_tv * variational_loss
-    return tf.reduce_mean(total_loss)
+    return tf.reduce_mean(total_loss), tf.reduce_mean(mse), tf.reduce_mean(variational_loss)
+
+@tf.function
+def step(noisy_data, clean_data):
+    with tf.GradientTape() as tape:
+        pred = model(noisy_data,training=True)
+        total_loss,loss_euclidian,loss_tv = loss_fn(clean_data, pred)
+        loss=tf.add_n([total_loss],model.losses)
+    grads = tape.gradient(total_loss, model.trainable_weights)
+    opt.apply_gradients(zip(grads, model.trainable_weights))
+    return loss,loss_euclidian,loss_tv
 
 model=create_model(list(INPUT_SIZE)+[1])
 model.summary()
@@ -116,8 +123,40 @@ lr=2e-3
 
 max_var=.3
 
-# Compile
-model.compile(loss=id_cnn_loss_fn, optimizer=Adam(learning_rate=2e-5, beta_1=0.5))
-
-# Train
-model.fit(train_generator, epochs=EPOCHS)
+opt = tf.keras.optimizers.Nadam(learning_rate=lr) # in the paper Adam optimizer with lr=2e-5 ,beta_1=.5 is used but I found this one converging faster
+train_loss=[]
+n_instances=train_generator.n
+numUpdates = int(n_instances / BS)
+# loop over the number of epochs
+for epoch in range(0, EPOCHS):
+    # show the current epoch number
+    print("[INFO] starting epoch {}/{} , learning_rate {}".format(
+        epoch + 1, EPOCHS,lr), end="")
+    sys.stdout.flush()
+    epochStart = time.time()
+    loss = 0
+    loss_batch = []
+    for i in tqdm(range(0, numUpdates)):
+        clean_data = next(train_generator)
+#         I Use Speckle Noise with Random Variance you can try a constant variance
+        noisy_data=random_noise(clean_data,mode='speckle',var=np.random.uniform(high=max_var))
+        loss = step(noisy_data,clean_data)
+        loss_batch.append((loss))
+    loss_batch = np.array(loss_batch)
+    loss_batch = np.sum(loss_batch, axis=0) / len(loss_batch)
+    total_loss,loss_euclidian,loss_tv=loss_batch
+    train_loss.append(loss_batch)
+    print('\nTraining_loss # ', 'total loss: ', float(total_loss),
+          'loss_euclidian: ', float(loss_euclidian),
+          'loss_tv: ', float(loss_tv),)
+    if epoch % 5==0:
+        plt.plot(train_loss)
+        plt.legend(['Total loss','Euclidian loss','Total Variation loss'])
+        plt.savefig(f"figure_epoch_{epoch}.png")
+        plt.show()
+        test_model(train_generator)
+    sys.stdout.flush()
+    # show timing information for the epoch
+    epochEnd = time.time()
+    elapsed = (epochEnd - epochStart) / 60.0
+    print("took {:.4} minutes".format(elapsed))
