@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import cv2
 import tensorflow as tf
 from tensorflow.keras.layers import Input,Conv2D,ReLU,BatchNormalization,LeakyReLU
 import os
@@ -12,9 +11,9 @@ import shutil
 
 INPUT_SIZE= (64,64)
 BS=16
-ROOT_DIR="/kaggle/"
+ROOT_DIR="/home/est_posgrado_manuel.suarez"
 
-DATASET=os.path.join(ROOT_DIR,'input/sentinel12-image-pairs-segregated-by-terrain/v_2')
+DATASET=os.path.join(ROOT_DIR,'data/sentinel12/v_2')
 DATA_GEN_INPUT=os.path.join(ROOT_DIR,'DATASET')
 
 if os.path.exists(DATA_GEN_INPUT):
@@ -63,7 +62,8 @@ def test_model(data_generator):
     plt.colorbar(mapple,ax=ax[2,0])
     mapple=ax[2,1].imshow(denoised_img2[0].reshape(INPUT_SIZE))
     plt.colorbar(mapple,ax=ax[2,1])
-    plt.show()
+    plt.savefig("figure1.png")
+    #plt.show()
 
 # Model creation
 def create_model(input_shape=(256, 256, 1)):
@@ -145,6 +145,7 @@ for epoch in range(0, EPOCHS):
     if epoch % 5==0:
         plt.plot(train_loss)
         plt.legend(['Total loss','Euclidian loss','Total Variation loss'])
+        plt.savefig(f"figure_epoch_{epoch}.png")
         plt.show()
         test_model(train_generator)
     sys.stdout.flush()
