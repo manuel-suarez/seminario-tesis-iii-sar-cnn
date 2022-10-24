@@ -97,3 +97,13 @@ def loss_fn(y_true, y_pred, l_tv=.0002):
     weight_loss = tf.reduce_sum(tf.math.abs(tf.math.divide(1, y_pred + 1e-5)))
     total_loss = mse + l_tv * variational_loss
     return tf.reduce_mean(total_loss), tf.reduce_mean(mse), tf.reduce_mean(variational_loss)
+
+@tf.function
+def step(noisy_data, clean_data):
+    with tf.GradientTape() as tape:
+        pred = model(noisy_data,training=True)
+        total_loss,loss_euclidian,loss_tv = loss_fn(clean_data, pred)
+        loss=tf.add_n([total_loss],model.losses)
+    grads = tape.gradient(total_loss, model.trainable_weights)
+    opt.apply_gradients(zip(grads, model.trainable_weights))
+    return loss,loss_euclidian,loss_tv
