@@ -110,3 +110,45 @@ def step(noisy_data, clean_data):
 
 model=create_model(list(INPUT_SIZE)+[1])
 test_model(train_generator)
+
+EPOCHS = 100 # The paper has trained the model for 2000 epochs
+lr=2e-3
+
+max_var=.3
+
+opt = tf.keras.optimizers.Nadam(learning_rate=lr) # in the paper Adam optimizer with lr=2e-5 ,beta_1=.5 is used but I found this one converging faster
+train_loss=[]
+n_instances=train_generator.n
+numUpdates = int(n_instances / BS)
+# loop over the number of epochs
+for epoch in range(0, EPOCHS):
+    # show the current epoch number
+    print("[INFO] starting epoch {}/{} , learning_rate {}".format(
+        epoch + 1, EPOCHS,lr), end="")
+    sys.stdout.flush()
+    epochStart = time.time()
+    loss = 0
+    loss_batch = []
+    for i in tqdm(range(0, numUpdates)):
+        clean_data = next(train_generator)
+#         I Use Speckle Noise with Random Variance you can try a constant variance
+        noisy_data=random_noise(clean_data,mode='speckle',var=np.random.uniform(high=max_var))
+        loss = step(noisy_data,clean_data)
+        loss_batch.append((loss))
+    loss_batch = np.array(loss_batch)
+    loss_batch = np.sum(loss_batch, axis=0) / len(loss_batch)
+    total_loss,loss_euclidian,loss_tv=loss_batch
+    train_loss.append(loss_batch)
+    print('\nTraining_loss # ', 'total loss: ', float(total_loss),
+          'loss_euclidian: ', float(loss_euclidian),
+          'loss_tv: ', float(loss_tv),)
+    if epoch % 5==0:
+        plt.plot(train_loss)
+        plt.legend(['Total loss','Euclidian loss','Total Variation loss'])
+        plt.show()
+        test_model(train_generator)
+    sys.stdout.flush()
+    # show timing information for the epoch
+    epochEnd = time.time()
+    elapsed = (epochEnd - epochStart) / 60.0
+    print("took {:.4} minutes".format(elapsed))
