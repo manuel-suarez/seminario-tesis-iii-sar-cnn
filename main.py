@@ -64,3 +64,25 @@ def test_model(data_generator):
     mapple=ax[2,1].imshow(denoised_img2[0].reshape(INPUT_SIZE))
     plt.colorbar(mapple,ax=ax[2,1])
     plt.show()
+
+# Model creation
+def create_model(input_shape=(256, 256, 1)):
+    input_layer = Input(shape=input_shape)
+    x = Conv2D(filters=64, kernel_size=(3, 3), padding='same')(input_layer)
+    x = LeakyReLU(.2)(x)
+    #   Here I'm using dialation in convolution layers but in the original paper There are NO dialation used
+    for i in range(1, 5):
+        x = Conv2D(filters=64, kernel_size=(3, 3), dilation_rate=i, padding='same', )(x)
+        x = BatchNormalization()(x)
+        x = LeakyReLU(.2)(x)
+    for i in range(4, 0, -1):
+        x = Conv2D(filters=64, kernel_size=(3, 3), dilation_rate=i, padding='same')(x)
+        x = BatchNormalization()(x)
+        x = ReLU()(x)
+    x = Conv2D(filters=1, kernel_size=(3, 3), padding='same')(x)
+    x = ReLU()(x)
+    x = tf.keras.layers.Lambda(lambda x: x + tf.constant(1e-7))(x)
+    x = tf.math.divide(input_layer, x)
+
+    x = tf.math.tanh(x)
+    return tf.keras.Model(inputs=input_layer, outputs=x)
