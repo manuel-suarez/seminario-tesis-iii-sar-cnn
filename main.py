@@ -81,14 +81,15 @@ def create_model(input_shape=(256, 256, 1)):
         x = ReLU()(x)
     x = Conv2D(filters=1, kernel_size=(3, 3), padding='same')(x)
     x = ReLU()(x)
+    x = tf.keras.layers.Lambda(lambda x: x + tf.constant(1e-7))(x)
     x = tf.math.divide(input_layer, x)
     x = tf.math.tanh(x)
     return tf.keras.Model(inputs=input_layer, outputs=x)
 
 
-MSE = tf.keras.losses.MeanSquaredError(reduction='none')
+mse_loss = tf.keras.losses.MeanSquaredError(reduction='none')
 def loss_fn(y_true, y_pred, l_tv=.0002):
-    mse = tf.reduce_sum(MSE(y_true, y_pred))
+    mse = tf.reduce_sum(mse_loss(y_true, y_pred))
     variational_loss = tf.image.total_variation(y_pred)
     weight_loss = tf.reduce_sum(tf.math.abs(tf.math.divide(1, y_pred + 1e-5)))
     total_loss = mse + l_tv * variational_loss
