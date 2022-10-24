@@ -107,3 +107,6 @@ def step(noisy_data, clean_data):
     grads = tape.gradient(total_loss, model.trainable_weights)
     opt.apply_gradients(zip(grads, model.trainable_weights))
     return loss,loss_euclidian,loss_tv
+
+model=create_model(list(INPUT_SIZE)+[1])
+test_model(train_generator)
